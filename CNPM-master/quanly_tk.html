@@ -1,0 +1,242 @@
+<!DOCTYPE html>
+<html lang="vi">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>Quản lý tài khoản</title>
+    <link rel="stylesheet" href="https://cdnjs.cloudflare.com/ajax/libs/font-awesome/5.15.1/css/all.min.css">
+    <link rel="stylesheet" href="https://cdnjs.cloudflare.com/ajax/libs/twitter-bootstrap/4.5.2/css/bootstrap.min.css">
+    <script src="https://cdnjs.cloudflare.com/ajax/libs/jquery/3.5.1/jquery.min.js"></script>
+    <script src="https://cdnjs.cloudflare.com/ajax/libs/twitter-bootstrap/4.5.2/js/bootstrap.bundle.min.js"></script>
+    <style>
+        body {
+            padding: 20px;
+        }
+        h2 {
+            margin-bottom: 20px;
+        }
+        .section {
+            margin-bottom: 40px;
+        }
+        .form-group label {
+            font-weight: bold;
+        }
+        .btn {
+            margin-top: 10px;
+        }
+    </style>
+</head>
+<body>
+
+<div class="container">
+    <h2>Quản lý tài khoản</h2>
+
+    <div class="form-group">
+        <label for="account-select">Chọn tài khoản:</label>
+        <select id="account-select" class="form-control" onchange="loadAccountDetails()">
+            <option value="">-- Chọn tài khoản --</option>
+        </select>
+    </div>
+
+    <div id="profile-section" class="section" style="display:none;">
+        <h3>Thông tin cá nhân</h3>
+        <div class="form-group">
+            <label for="name">Họ và tên:</label>
+            <input type="text" id="name" class="form-control">
+        </div>
+        <div class="form-group">
+            <label for="phone">Số điện thoại:</label>
+            <input type="text" id="phone" class="form-control">
+        </div>
+        <div class="form-group">
+            <label for="email">Email:</label>
+            <input type="text" id="email" class="form-control">
+        </div>
+        <div class="form-group">
+            <label for="dob">Ngày sinh:</label>
+            <input type="date" id="dob" class="form-control">
+        </div>
+        <div class="form-group">
+            <label for="address">Địa chỉ:</label>
+            <input type="text" id="address" class="form-control">
+        </div>
+        <div class="form-group">
+            <label>Giới tính:</label><br>
+            <input type="radio" name="gender" value="male"> Nam
+            <input type="radio" name="gender" value="female"> Nữ
+            <input type="radio" name="gender" value="other"> Khác
+        </div>
+        <button class="btn btn-primary" onclick="updateProfile()">Cập nhật thông tin</button>
+    </div>
+
+    <div id="password-section" class="section" style="display:none;">
+        <h3>Đổi mật khẩu</h3>
+        <div class="form-group">
+            <label for="current-password">Mật khẩu hiện tại:</label>
+            <input type="password" id="current-password" class="form-control">
+        </div>
+        <div class="form-group">
+            <label for="new-password">Mật khẩu mới:</label>
+            <input type="password" id="new-password" class="form-control">
+        </div>
+        <div class="form-group">
+            <label for="confirm-password">Xác nhận mật khẩu mới:</label>
+            <input type="password" id="confirm-password" class="form-control">
+        </div>
+        <button class="btn btn-primary" onclick="changePassword()">Đổi mật khẩu</button>
+    </div>
+
+    <div id="settings-section" class="section" style="display:none;">
+        <h3>Cài đặt tài khoản</h3>
+        <button class="btn btn-danger" onclick="deleteAccount()">Xóa tài khoản</button>
+    </div>
+</div>
+
+<script>
+    // Lấy danh sách tài khoản từ database
+    let users = [];
+    let selectedUser = null;
+
+    async function fetchUsers() {
+        const res = await fetch('PHP/get_users.php');
+        users = await res.json();
+        populateAccountSelect();
+    }
+
+    function populateAccountSelect() {
+        const select = document.getElementById('account-select');
+        select.innerHTML = '<option value="">-- Chọn tài khoản --</option>';
+        users.forEach(user => {
+            const option = document.createElement('option');
+            option.value = user.id;
+            option.textContent = `${user.name} (${user.username})`;
+            select.appendChild(option);
+        });
+    }
+
+    function loadAccountDetails() {
+        const id = document.getElementById('account-select').value;
+        selectedUser = users.find(u => u.id === id);
+        const profileSection = document.getElementById('profile-section');
+        const passwordSection = document.getElementById('password-section');
+        const settingsSection = document.getElementById('settings-section');
+        if (selectedUser) {
+            profileSection.style.display = 'block';
+            passwordSection.style.display = 'block';
+            settingsSection.style.display = 'block';
+            document.getElementById('name').value = selectedUser.name || '';
+            document.getElementById('phone').value = selectedUser.phone || '';
+            document.getElementById('email').value = selectedUser.email || '';
+            document.getElementById('dob').value = selectedUser.dob || '';
+            document.getElementById('address').value = selectedUser.address || '';
+            const genderInputs = document.getElementsByName('gender');
+            genderInputs.forEach(input => {
+                input.checked = input.value === selectedUser.gender;
+            });
+        } else {
+            profileSection.style.display = 'none';
+            passwordSection.style.display = 'none';
+            settingsSection.style.display = 'none';
+        }
+    }
+
+    async function updateProfile() {
+        if (!selectedUser) return;
+        const nameValue    = document.getElementById('name').value;
+        const phoneValue   = document.getElementById('phone').value;
+        const emailValue   = document.getElementById('email').value;
+        const dobValue     = document.getElementById('dob').value;
+        const addressValue = document.getElementById('address').value;
+        const genderInputs = document.getElementsByName('gender');
+        const selectedGender = Array.from(genderInputs).find(input => input.checked)?.value || selectedUser.gender;
+        // Kiểm tra định dạng email
+        const emailRegex = /^[^\s@]+@[^\s@]+\.[^\s@]+$/;
+        if (!emailRegex.test(emailValue)) {
+            alert("Email không đúng định dạng!");
+            return;
+        }
+        // Kiểm tra số điện thoại: đủ 10 số và bắt đầu bằng số 0
+        const phoneRegex = /^0\d{9}$/;
+        if (!phoneRegex.test(phoneValue)) {
+            alert("Số điện thoại phải bắt đầu bằng số 0 và đủ 10 chữ số!");
+            return;
+        }
+        const res = await fetch('PHP/update_user.php', {
+            method: 'POST',
+            headers: { 'Content-Type': 'application/json' },
+            body: JSON.stringify({
+                id: selectedUser.id,
+                name: nameValue,
+                phone: phoneValue,
+                email: emailValue,
+                dob: dobValue,
+                address: addressValue,
+                gender: selectedGender
+            })
+        });
+        const data = await res.json();
+        if (data.success) {
+            alert('Thông tin cá nhân đã được cập nhật!');
+            fetchUsers();
+            document.getElementById('account-select').value = selectedUser.id;
+        } else {
+            alert('Cập nhật thất bại: ' + (data.message || 'Lỗi không xác định'));
+        }
+    }
+
+    async function changePassword() {
+        if (!selectedUser) return;
+        const currentPassword = document.getElementById('current-password').value;
+        const newPassword = document.getElementById('new-password').value;
+        const confirmPassword = document.getElementById('confirm-password').value;
+        if (newPassword !== confirmPassword) {
+            alert("Mật khẩu mới và xác nhận mật khẩu không khớp!");
+            return;
+        }
+        const res = await fetch('PHP/change_password.php', {
+            method: 'POST',
+            headers: { 'Content-Type': 'application/json' },
+            body: JSON.stringify({
+                id: selectedUser.id,
+                current_password: currentPassword,
+                new_password: newPassword
+            })
+        });
+        const data = await res.json();
+        if (data.success) {
+            alert('Mật khẩu đã được thay đổi!');
+            document.getElementById('current-password').value = '';
+            document.getElementById('new-password').value = '';
+            document.getElementById('confirm-password').value = '';
+        } else {
+            alert(data.message || 'Đổi mật khẩu thất bại!');
+        }
+    }
+
+    async function deleteAccount() {
+        if (!selectedUser) return;
+        if (confirm("Bạn có chắc chắn muốn xóa tài khoản này? Hành động này không thể hoàn tác.")) {
+            const res = await fetch('PHP/delete_user.php', {
+                method: 'POST',
+                headers: { 'Content-Type': 'application/json' },
+                body: JSON.stringify({ id: selectedUser.id })
+            });
+            const data = await res.json();
+            if (data.success) {
+                alert('Tài khoản đã được xóa!');
+                fetchUsers();
+                document.getElementById('profile-section').style.display = 'none';
+                document.getElementById('password-section').style.display = 'none';
+                document.getElementById('settings-section').style.display = 'none';
+            } else {
+                alert('Xóa tài khoản thất bại: ' + (data.message || 'Lỗi không xác định'));
+            }
+        }
+    }
+
+    // Khởi tạo khi load trang
+    fetchUsers();
+</script>
+
+</body>
+</html>
