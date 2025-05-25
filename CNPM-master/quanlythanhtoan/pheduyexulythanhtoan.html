@@ -1,0 +1,51 @@
+<!DOCTYPE html>
+<html lang="vi">
+<head>
+  <meta charset="UTF-8" />
+  <title>Phê Duyệt Thanh Toán</title>
+  <style>
+    body { font-family: Arial; margin: 30px; }
+    ul { border: 1px solid #ccc; padding: 15px; background: #f9f9f9; }
+    li { margin-bottom: 10px; }
+    button { padding: 6px 10px; }
+  </style>
+</head>
+<body>
+  <h2>Danh sách hóa đơn chờ phê duyệt</h2>
+  <ul id="invoiceList">Đang tải...</ul>
+  <script>
+    // Đường dẫn chuẩn tới PHP
+    const BASE_API = "http://localhost/Okelaaa/CNPM-master/PHP/";
+
+    async function fetchPending() {
+      const res = await fetch(BASE_API + "get_pending_invoices.php");
+      const data = await res.json();
+      const ul = document.getElementById("invoiceList");
+      ul.innerHTML = "";
+      if (data.success && data.invoices.length > 0) {
+        data.invoices.forEach(inv => {
+          const li = document.createElement("li");
+          li.innerHTML = `Hóa đơn ${inv.id} - ${Number(inv.total).toLocaleString('vi-VN')} VNĐ 
+            <button onclick="approve('${inv.id}')">Phê duyệt</button>`;
+          ul.appendChild(li);
+        });
+      } else {
+        ul.innerHTML = "<li>Không có hóa đơn nào chờ phê duyệt</li>";
+      }
+    }
+
+    async function approve(id) {
+      const res = await fetch(BASE_API + "approve_invoice.php", {
+        method: "POST",
+        headers: { "Content-Type": "application/json" },
+        body: JSON.stringify({ id })
+      });
+      const result = await res.json();
+      alert(result.success ? "Đã phê duyệt!" : ("Lỗi xử lý: " + result.message));
+      fetchPending();
+    }
+
+    fetchPending();
+  </script>
+</body>
+</html>

@@ -1,0 +1,138 @@
+<!DOCTYPE html>
+<html lang="vi">
+<head>
+  <meta charset="UTF-8" />
+  <title>Kiểm Tra Hóa Đơn</title>
+  <style>
+    body { font-family: Arial; margin: 30px; }
+    input, button {
+      padding: 6px 10px;
+      font-size: 16px;
+      margin-right: 10px;
+    }
+    #invoiceResult { margin-top: 20px; border: 1px solid #ccc; padding: 10px; background: #f9f9f9; }
+    .error { color: red; font-weight: bold; }
+    .loading { color: #888; font-style: italic; }
+    .debug { font-family: monospace; white-space: pre-wrap; background: #eee; padding: 5px; font-size: 12px; }
+    .showDebug { font-size: 12px; margin-top: 20px; color: blue; cursor: pointer; }
+  </style>
+</head>
+<body>
+  <h2>Tra cứu hóa đơn</h2>
+  <form onsubmit="event.preventDefault(); checkInvoice();">
+    <label>Mã hóa đơn:</label>
+    <input type="text" id="invoiceId" required />
+    <button type="submit">Kiểm tra</button>
+  </form>
+  <div id="invoiceResult"></div>
+  <div class="showDebug" onclick="toggleDebug()">Hiện thông tin debug</div>
+  <div id="debugOutput" class="debug" style="display:none;"></div>
+
+  <script>
+    // Kiểm tra và hiển thị API URL
+  const apiBaseUrl = "http://localhost/Okelaaa/CNPM-master/PHP";
+  function getApiUrl() {
+     return `${apiBaseUrl}/get_invoice.php`; 
+    }
+    
+    // Kiểm tra kết nối API
+    async function testApi() {
+      try {
+        const res = await fetch(getApiUrl(), { method: "HEAD" });
+        return res.ok;
+      } catch (error) {
+        return false;
+      }
+    }
+    
+    // Toggle debug
+    function toggleDebug() {
+      const debugOutput = document.getElementById("debugOutput");
+      if (debugOutput.style.display === "none") {
+        debugOutput.style.display = "block";
+      } else {
+        debugOutput.style.display = "none";
+      }
+    }
+
+    // Hàm chính để kiểm tra hóa đơn
+    async function checkInvoice() {
+      const id = document.getElementById("invoiceId").value;
+      const output = document.getElementById("invoiceResult");
+      const debugOutput = document.getElementById("debugOutput");
+      
+      // Reset debug
+      debugOutput.innerHTML = "";
+      
+      // Kiểm tra API có hoạt động không
+      const isApiAvailable = await testApi();
+      if (!isApiAvailable) {
+        debugOutput.style.display = "block";
+        debugOutput.innerHTML = `<p>API URL: ${getApiUrl()}</p>
+          <p>API không khả dụng, vui lòng kiểm tra:</p>
+          <ol>
+            <li>Apache/XAMPP đang chạy</li>
+            <li>Đường dẫn file PHP là chính xác</li>
+            <li>Đường dẫn web root đúng với cấu trúc thư mục</li>
+          </ol>`;
+        output.innerHTML = "<p class='error'>Không thể kết nối đến máy chủ API</p>";
+        return;
+      }
+      
+      // Hiển thị trạng thái đang tải
+      output.innerHTML = "<p class='loading'>Đang tìm kiếm hóa đơn...</p>";
+      
+      try {
+        // Gọi API
+        const res = await fetch(getApiUrl(), {
+          method: "POST",
+          headers: {
+            "Content-Type": "application/json"
+          },
+          body: JSON.stringify({ id })
+        });
+        
+        // Lấy text trước để debug nếu cần
+        const textResponse = await res.text();
+        
+        // Debug info
+        debugOutput.innerHTML = `<p>API URL: ${getApiUrl()}</p>
+          <p>HTTP Status: ${res.status} ${res.statusText}</p>
+          <p>Response:</p>
+          <pre>${textResponse}</pre>`;
+        
+        // Kiểm tra phản hồi có phải JSON không
+        try {
+          // Parse JSON từ text
+          const data = JSON.parse(textResponse);
+          
+          if (data.success) {
+            // Format dựa vào cấu trúc mới hoặc cũ
+            const invoice = data.data?.invoice || data.invoice;
+            
+            if (!invoice) {
+              throw new Error("Cấu trúc dữ liệu không đúng định dạng");
+            }
+            
+            output.innerHTML = `
+              <p>Tổng tiền: ${Number(invoice.total).toLocaleString('vi-VN')} VNĐ</p>
+              <p>Trạng thái: ${invoice.status}</p>
+            `;
+          } else {
+            output.innerHTML = `<p class="error">Không tìm thấy hóa đơn: ${data.message || ''}</p>`;
+          }
+        } catch (jsonError) {
+          // Nếu không phải JSON, hiển thị nội dung phản hồi để debug
+          console.error("JSON parse error:", jsonError);
+          output.innerHTML = `<p class="error">Lỗi khi phân tích dữ liệu từ server</p>`;
+          debugOutput.style.display = "block";
+        }
+      } catch (error) {
+        console.error("Fetch error:", error);
+        output.innerHTML = `<p class="error">Đã xảy ra lỗi khi kiểm tra hóa đơn: ${error.message}</p>`;
+        debugOutput.style.display = "block";
+      }
+    }
+  </script>
+</body>
+</html>
